@@ -1,0 +1,108 @@
+# Card-not-present payment screening, PROPOSED v1.1: fewer false-positive reviews on
+# spikes, but a new hard block for large payments from unseen devices abroad.
+# SYNTHETIC EXAMPLE.
+#
+# Three outcomes: let the payment through, hold it for manual review, or block it.
+# Missing signals are treated cautiously: a payment that *might* be blocked goes to review.
+
+[policy]
+name = "payment-fraud-screen"
+version = "1.1"
+description = "Real-time screening of card-not-present payments."
+strategy = "most_severe"
+outcomes = ["allow", "review", "block"]
+default = "allow"
+on_unknown = "review"
+
+[schema]
+amount = "number"
+account_age_days = "int"
+txns_last_hour = "int"
+failed_attempts_24h = "int"
+avg_amount_90d = "number"
+billing_country = "string"
+ip_country = "string"
+card_present = "bool"
+device_seen_before = "bool"
+email_domain = "string"
+
+[derived]
+amount_vs_avg = "amount / avg_amount_90d"
+geo_mismatch = "billing_country != ip_country"
+
+[[rules]]
+id = "VELOCITY_EXTREME"
+when = "txns_last_hour >= 10"
+outcome = "block"
+reason = "{txns_last_hour} transactions in the last hour"
+
+[[rules]]
+id = "CARD_TESTING"
+when = "failed_attempts_24h >= 5 and amount < 5"
+outcome = "block"
+reason = "{failed_attempts_24h} failed attempts and a very small amount look like card testing"
+
+[[rules]]
+id = "DISPOSABLE_EMAIL_LARGE"
+when = "email_domain in ['mailinator.com', 'tempmail.io', 'guerrillamail.com'] and amount > 200"
+outcome = "block"
+reason = "Disposable email domain ({email_domain}) on a {amount:.2f} payment"
+
+[[rules]]
+id = "GEO_MISMATCH_LARGE"
+when = "geo_mismatch and not device_seen_before and amount > 2000"
+outcome = "block"
+reason = "{amount:.2f} payment from {ip_country} on an unseen device with {billing_country} billing"
+
+[[rules]]
+id = "AMOUNT_SPIKE"
+when = "amount_vs_avg > 8 and amount > 500"
+outcome = "review"
+reason = "Amount {amount:.2f} is {amount_vs_avg:.1f}x this customer's 90-day average"
+
+[[rules]]
+id = "GEO_MISMATCH_NEW_DEVICE"
+when = "geo_mismatch and not device_seen_before"
+outcome = "review"
+reason = "Billing country {billing_country} differs from IP country {ip_country} on an unseen device"
+
+[[rules]]
+id = "NEW_ACCOUNT_LARGE"
+when = "account_age_days < 7 and amount > 500"
+outcome = "review"
+reason = "Account is {account_age_days} days old and the payment is {amount:.2f}"
+
+[[rules]]
+id = "VELOCITY_HIGH"
+when = "txns_last_hour >= 5"
+outcome = "review"
+reason = "{txns_last_hour} transactions in the last hour"
+
+[[rules]]
+id = "REPEATED_FAILURES"
+when = "failed_attempts_24h >= 3 and not card_present"
+outcome = "review"
+reason = "{failed_attempts_24h} failed attempts in 24 hours"
+
+[[tests]]
+name = "ordinary payment is allowed"
+input = { amount = 42.5, account_age_days = 400, txns_last_hour = 1, failed_attempts_24h = 0, avg_amount_90d = 55, billing_country = "US", ip_country = "US", card_present = false, device_seen_before = true, email_domain = "example.com" }
+expect = "allow"
+expect_rules = []
+
+[[tests]]
+name = "burst of transactions is blocked"
+input = { amount = 30, account_age_days = 400, txns_last_hour = 12, failed_attempts_24h = 0, avg_amount_90d = 55, billing_country = "US", ip_country = "US", card_present = false, device_seen_before = true, email_domain = "example.com" }
+expect = "block"
+expect_rules = ["VELOCITY_EXTREME"]
+
+[[tests]]
+name = "unfamiliar device in another country is reviewed"
+input = { amount = 80, account_age_days = 400, txns_last_hour = 1, failed_attempts_24h = 0, avg_amount_90d = 70, billing_country = "US", ip_country = "RO", card_present = false, device_seen_before = false, email_domain = "example.com" }
+expect = "review"
+expect_rules = ["GEO_MISMATCH_NEW_DEVICE"]
+
+[[tests]]
+name = "no purchase history means the spike rule cannot run, so review"
+input = { amount = 900, account_age_days = 400, txns_last_hour = 1, failed_attempts_24h = 0, billing_country = "US", ip_country = "US", card_present = false, device_seen_before = true, email_domain = "example.com" }
+expect = "review"

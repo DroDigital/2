@@ -1,0 +1,112 @@
+# Mortgage pre-qualification screening, PROPOSED v2: tighter debt limits, a wider borderline
+# band, and no employment-tenure rule. Replay it against history with `rulelens diff`.
+# SYNTHETIC EXAMPLE: not real underwriting guidance.
+#
+# strategy "most_severe": every rule is evaluated and the worst outcome wins, so adding a
+# rule can never accidentally weaken a decline. on_unknown makes the policy fail safe:
+# if missing data could have produced a worse outcome, the applicant goes to a human.
+
+[policy]
+name = "mortgage-prequalification"
+version = "2.0"
+description = "Automated first-pass screening of mortgage applications."
+strategy = "most_severe"
+outcomes = ["approve", "refer", "decline"]   # ordered least to most severe
+default = "approve"
+on_unknown = "refer"
+
+[schema]
+credit_score = "int"
+annual_income = "number"
+monthly_debt = "number"
+loan_amount = "number"
+property_value = "number"
+bankruptcies_7y = "int"
+
+[derived]
+dti = "monthly_debt * 12 / annual_income"   # debt-to-income ratio
+ltv = "loan_amount / property_value"        # loan-to-value ratio
+
+# -- hard declines ------------------------------------------------------------------------------
+
+[[rules]]
+id = "BANKRUPTCY_RECENT"
+when = "bankruptcies_7y > 0"
+outcome = "decline"
+reason = "Bankruptcy on record within the last 7 years"
+
+[[rules]]
+id = "CREDIT_SCORE_LOW"
+when = "credit_score < 580"
+outcome = "decline"
+reason = "Credit score {credit_score} is below the minimum of 580"
+
+[[rules]]
+id = "DTI_EXCESSIVE"
+when = "dti > 0.45"
+outcome = "decline"
+reason = "Debt-to-income ratio {dti:.1%} exceeds the 45% hard limit"
+
+[[rules]]
+id = "LTV_EXCESSIVE"
+when = "ltv > 0.97"
+outcome = "decline"
+reason = "Loan-to-value ratio {ltv:.1%} exceeds the 97% hard limit"
+
+# -- referred to an underwriter -----------------------------------------------------------------
+
+[[rules]]
+id = "DTI_HIGH"
+when = "dti > 0.40"
+outcome = "refer"
+reason = "Debt-to-income ratio {dti:.1%} is above the 40% guideline"
+
+[[rules]]
+id = "SCORE_BORDERLINE"
+when = "credit_score >= 580 and credit_score < 660"
+outcome = "refer"
+reason = "Credit score {credit_score} is in the borderline band (580-659)"
+
+[[rules]]
+id = "LTV_HIGH_WEAK_CREDIT"
+when = "ltv > 0.80 and credit_score < 700"
+outcome = "refer"
+reason = "Loan-to-value {ltv:.1%} with a credit score of {credit_score} needs review"
+
+# -- regression tests: run with `rulelens test` ---------------------------------------------------
+
+[[tests]]
+name = "strong applicant is approved"
+input = { credit_score = 760, annual_income = 90000, monthly_debt = 1200, loan_amount = 250000, property_value = 400000, bankruptcies_7y = 0 }
+expect = "approve"
+expect_rules = []
+
+[[tests]]
+name = "low credit score is declined"
+input = { credit_score = 540, annual_income = 90000, monthly_debt = 1200, loan_amount = 250000, property_value = 400000, bankruptcies_7y = 0 }
+expect = "decline"
+expect_rules = ["CREDIT_SCORE_LOW"]
+
+[[tests]]
+name = "every applicable decline reason is reported"
+input = { credit_score = 540, annual_income = 90000, monthly_debt = 1200, loan_amount = 250000, property_value = 400000, bankruptcies_7y = 1 }
+expect = "decline"
+expect_rules = ["BANKRUPTCY_RECENT", "CREDIT_SCORE_LOW"]
+
+[[tests]]
+name = "high debt-to-income goes to an underwriter"
+input = { credit_score = 740, annual_income = 60000, monthly_debt = 2100, loan_amount = 200000, property_value = 400000, bankruptcies_7y = 0 }
+expect = "refer"
+expect_rules = ["DTI_HIGH"]
+
+[[tests]]
+name = "missing credit score fails safe to referral"
+input = { annual_income = 90000, monthly_debt = 1200, loan_amount = 250000, property_value = 400000, bankruptcies_7y = 0 }
+expect = "refer"
+expect_rules = ["CREDIT_SCORE_LOW", "SCORE_BORDERLINE"]
+
+[[tests]]
+name = "a known decline is not softened by missing data"
+input = { credit_score = 560, annual_income = 90000, loan_amount = 250000, property_value = 400000, bankruptcies_7y = 0 }
+expect = "decline"
+expect_rules = ["CREDIT_SCORE_LOW"]

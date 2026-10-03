@@ -52,6 +52,10 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+ignore = [
+  "E501",  # line wrapping is delegated to `ruff format`
+  "RUF001", "RUF002", "RUF003",  # typographic characters (–, ’, “ ”) are intentional in reports
+]
 
 [tool.mypy]
 python_version = "3.11"

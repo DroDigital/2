@@ -1,0 +1,103 @@
+# Clinical-trial pre-screening against inclusion/exclusion criteria.
+# SYNTHETIC, ILLUSTRATIVE EXAMPLE: not clinical guidance and not a real protocol.
+#
+# Eligibility criteria are rules. Missing lab values must never silently pass a participant,
+# so on_unknown routes to a human coordinator instead.
+
+[policy]
+name = "t2d-trial-prescreen"
+version = "0.3"
+description = "Pre-screening for a hypothetical type 2 diabetes study."
+strategy = "most_severe"
+outcomes = ["eligible", "needs_review", "ineligible"]
+default = "eligible"
+on_unknown = "needs_review"
+
+[schema]
+age = "int"
+hba1c = "number"
+egfr = "number"
+bmi = "number"
+systolic_bp = "number"
+pregnant = "bool"
+on_insulin = "bool"
+prior_cardiac_event = "bool"
+months_since_cardiac_event = "int"   # only recorded when there was an event
+
+[[rules]]
+id = "EXCL_AGE"
+when = "age < 18 or age > 75"
+outcome = "ineligible"
+reason = "Age {age} is outside the 18-75 range"
+
+[[rules]]
+id = "EXCL_PREGNANT"
+when = "pregnant"
+outcome = "ineligible"
+reason = "Participant is pregnant"
+
+[[rules]]
+id = "EXCL_HBA1C"
+when = "hba1c < 7.0 or hba1c > 10.5"
+outcome = "ineligible"
+reason = "HbA1c {hba1c:.1f}% is outside the 7.0-10.5% range"
+
+[[rules]]
+id = "EXCL_RENAL"
+when = "egfr < 45"
+outcome = "ineligible"
+reason = "eGFR {egfr:.0f} is below 45"
+
+# No event means months_since_cardiac_event is blank. Three-valued logic handles that:
+# `false and unknown` is false, so this rule does not need a special case.
+[[rules]]
+id = "EXCL_RECENT_CARDIAC"
+when = "prior_cardiac_event and months_since_cardiac_event < 6"
+outcome = "ineligible"
+reason = "Cardiac event {months_since_cardiac_event} months ago (minimum 6)"
+
+[[rules]]
+id = "REVIEW_BMI"
+when = "bmi < 18.5 or bmi > 45"
+outcome = "needs_review"
+reason = "BMI {bmi:.1f} is outside the usual 18.5-45 range"
+
+[[rules]]
+id = "REVIEW_BP"
+when = "systolic_bp >= 180"
+outcome = "needs_review"
+reason = "Systolic blood pressure {systolic_bp:.0f} is 180 or higher"
+
+[[rules]]
+id = "REVIEW_INSULIN"
+when = "on_insulin"
+outcome = "needs_review"
+reason = "Currently using insulin"
+
+[[tests]]
+name = "typical candidate is eligible"
+input = { age = 54, hba1c = 8.2, egfr = 78, bmi = 31, systolic_bp = 134, pregnant = false, on_insulin = false, prior_cardiac_event = false }
+expect = "eligible"
+expect_rules = []
+
+[[tests]]
+name = "no cardiac event: blank month count does not block or flag"
+input = { age = 54, hba1c = 8.2, egfr = 78, bmi = 31, systolic_bp = 134, pregnant = false, on_insulin = false, prior_cardiac_event = false }
+expect = "eligible"
+
+[[tests]]
+name = "recent cardiac event excludes"
+input = { age = 54, hba1c = 8.2, egfr = 78, bmi = 31, systolic_bp = 134, pregnant = false, on_insulin = false, prior_cardiac_event = true, months_since_cardiac_event = 3 }
+expect = "ineligible"
+expect_rules = ["EXCL_RECENT_CARDIAC"]
+
+[[tests]]
+name = "missing lab result goes to a coordinator, never silently eligible"
+input = { age = 54, egfr = 78, bmi = 31, systolic_bp = 134, pregnant = false, on_insulin = false, prior_cardiac_event = false }
+expect = "needs_review"
+
+[[tests]]
+name = "a clear exclusion wins over missing data"
+input = { age = 80, bmi = 31, pregnant = false, on_insulin = false, prior_cardiac_event = false }
+expect = "ineligible"
+expect_rules = ["EXCL_AGE"]
