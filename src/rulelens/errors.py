@@ -14,9 +14,12 @@ class ExpressionError(RuleLensError):
     exact location of the problem.
     """
 
-    def __init__(self, message: str, source: str, start: int, end: int | None = None) -> None:
+    def __init__(
+        self, message: str, source: str, start: int, end: int | None = None, code: str = "E001"
+    ) -> None:
         super().__init__(message)
         self.message = message
+        self.code = code  # E001 syntax, E002 unknown name, E003 type error
         self.source = source
         self.start = start
         self.end = end if end is not None else start + 1

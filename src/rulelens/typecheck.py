@@ -58,8 +58,8 @@ class _Checker:
         self.field_types = field_types
         self.known = known
 
-    def fail(self, message: str, node: Node) -> ExpressionError:
-        return ExpressionError(message, self.source, node.span[0], node.span[1])
+    def fail(self, message: str, node: Node, code: str = "E003") -> ExpressionError:
+        return ExpressionError(message, self.source, node.span[0], node.span[1], code)
 
     def check(self, node: Node) -> str:
         if isinstance(node, Literal):
@@ -69,7 +69,7 @@ class _Checker:
             if found is None:
                 hint = difflib.get_close_matches(node.name, self.known, n=1)
                 suffix = f"; did you mean '{hint[0]}'?" if hint else ""
-                raise self.fail(f"unknown field '{node.name}'{suffix}", node)
+                raise self.fail(f"unknown field '{node.name}'{suffix}", node, "E002")
             return found
         if isinstance(node, ListLiteral):
             return self._list(node)
@@ -146,7 +146,7 @@ class _Checker:
         if spec is None:
             hint = difflib.get_close_matches(node.name, FUNCTIONS, n=1)
             suffix = f"; did you mean '{hint[0]}'?" if hint else ""
-            raise self.fail(f"unknown function '{node.name}'{suffix}", node)
+            raise self.fail(f"unknown function '{node.name}'{suffix}", node, "E002")
         n_params = len(spec.params)
         low = n_params - spec.optional
         count = len(node.args)
