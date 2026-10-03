@@ -2,7 +2,7 @@
 
 **Explainable business-rule decisions, with static analysis and policy impact diffing.**
 
-[![CI](https://github.com/drodigital/2/actions/workflows/ci.yml/badge.svg)](https://github.com/drodigital/2/actions/workflows/ci.yml)
+[![CI](https://github.com/DroDigital/2/actions/workflows/ci.yml/badge.svg)](https://github.com/DroDigital/2/actions/workflows/ci.yml)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Dependencies: none](https://img.shields.io/badge/runtime%20dependencies-none-brightgreen)
 ![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -34,7 +34,7 @@ tests.
 ## Try it in a minute
 
 ```bash
-git clone https://github.com/drodigital/2 rulelens && cd rulelens
+git clone https://github.com/DroDigital/2 rulelens && cd rulelens
 pip install -e .
 
 rulelens lint examples/lint_demo/policy.toml          # find mistakes in rules
