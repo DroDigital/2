@@ -1,0 +1,100 @@
+# Property & casualty claims triage. SYNTHETIC EXAMPLE.
+#
+# strategy "first_match": rules are checked top to bottom and the first match decides, like a
+# decision table. Order is part of the logic, which is exactly what `rulelens lint` checks
+# for shadowed rules. Outcomes run from least to most severe.
+
+[policy]
+name = "claims-triage"
+version = "1.0"
+description = "Routes incoming claims to auto-approval, an adjuster, the fraud unit, or denial."
+strategy = "first_match"
+outcomes = ["auto_approve", "adjuster_review", "siu_referral", "deny"]
+default = "adjuster_review"
+on_unknown = "adjuster_review"
+
+[schema]
+claim_amount = "number"
+coverage_limit = "number"
+claim_type = "string"
+policy_active = "bool"
+policy_start = "date"
+loss_date = "date"
+reported_date = "date"
+prior_claims_12m = "int"
+police_report = "bool"
+
+[derived]
+days_since_inception = "days_between(policy_start, loss_date)"
+report_delay_days = "days_between(loss_date, reported_date)"
+
+[[rules]]
+id = "POLICY_INACTIVE"
+when = "not policy_active"
+outcome = "deny"
+reason = "Policy was not active at the time of loss"
+
+[[rules]]
+id = "LOSS_BEFORE_START"
+when = "days_since_inception < 0"
+outcome = "deny"
+reason = "Loss date {loss_date} is before the policy start {policy_start}"
+
+[[rules]]
+id = "EARLY_THEFT"
+when = "claim_type == 'theft' and days_since_inception < 30"
+outcome = "siu_referral"
+reason = "Theft claim only {days_since_inception} days after the policy began"
+
+[[rules]]
+id = "FREQUENT_CLAIMANT"
+when = "prior_claims_12m >= 3"
+outcome = "siu_referral"
+reason = "{prior_claims_12m} prior claims in the last 12 months"
+
+[[rules]]
+id = "OVER_LIMIT"
+when = "claim_amount > coverage_limit"
+outcome = "adjuster_review"
+reason = "Claim of {claim_amount:,.0f} exceeds the coverage limit of {coverage_limit:,.0f}"
+
+[[rules]]
+id = "LATE_REPORT"
+when = "report_delay_days > 60"
+outcome = "adjuster_review"
+reason = "Reported {report_delay_days} days after the loss"
+
+[[rules]]
+id = "THEFT_WITHOUT_POLICE_REPORT"
+when = "claim_type == 'theft' and not police_report"
+outcome = "adjuster_review"
+reason = "Theft claim with no police report"
+
+[[rules]]
+id = "LOW_VALUE_CLEAN"
+when = "claim_amount <= 1500 and prior_claims_12m == 0 and claim_type in ['auto', 'medical']"
+outcome = "auto_approve"
+reason = "Low-value claim ({claim_amount:,.0f}) with no recent claims history"
+
+[[tests]]
+name = "small clean auto claim is auto-approved"
+input = { claim_amount = 900, coverage_limit = 20000, claim_type = "auto", policy_active = true, policy_start = "2024-01-01", loss_date = "2025-03-01", reported_date = "2025-03-03", prior_claims_12m = 0, police_report = false }
+expect = "auto_approve"
+expect_rules = ["LOW_VALUE_CLEAN"]
+
+[[tests]]
+name = "an inactive policy is denied even if everything else looks fine"
+input = { claim_amount = 900, coverage_limit = 20000, claim_type = "auto", policy_active = false, policy_start = "2024-01-01", loss_date = "2025-03-01", reported_date = "2025-03-03", prior_claims_12m = 0, police_report = false }
+expect = "deny"
+expect_rules = ["POLICY_INACTIVE"]
+
+[[tests]]
+name = "early theft goes to the fraud unit"
+input = { claim_amount = 4000, coverage_limit = 20000, claim_type = "theft", policy_active = true, policy_start = "2025-02-10", loss_date = "2025-03-01", reported_date = "2025-03-02", prior_claims_12m = 0, police_report = true }
+expect = "siu_referral"
+expect_rules = ["EARLY_THEFT"]
+
+[[tests]]
+name = "unreadable dates send the claim to an adjuster rather than guessing"
+input = { claim_amount = 900, coverage_limit = 20000, claim_type = "auto", policy_active = true, policy_start = "not a date", loss_date = "2025-03-01", reported_date = "2025-03-03", prior_claims_12m = 0, police_report = false }
+expect = "adjuster_review"

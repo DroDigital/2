@@ -1,0 +1,47 @@
+# A support-ticket router with deliberate mistakes, to show what `rulelens lint` finds.
+# Run:  rulelens lint examples/lint_demo/policy.toml
+
+[policy]
+name = "ticket-router"
+version = "0.1"
+strategy = "first_match"
+outcomes = ["normal", "priority", "escalate"]
+default = "normal"
+
+[schema]
+tier = "string"
+severity = "int"        # 1 (low) to 5 (critical)
+hours_open = "number"
+region = "string"
+
+[[rules]]
+id = "ENTERPRISE_CRITICAL"
+when = "tier == 'enterprise' and severity >= 3"
+outcome = "escalate"
+reason = "Enterprise customer with severity {severity}"
+
+[[rules]]
+id = "SEVERE"
+when = "severity >= 3"
+outcome = "priority"
+reason = "Severity {severity}"
+
+# Mistake 1: anything this matches is already caught by SEVERE above it.
+[[rules]]
+id = "FREE_TIER_CRITICAL"
+when = "severity >= 4 and tier == 'free'"
+outcome = "escalate"
+reason = "Free-tier critical ticket"
+
+# Mistake 2: no severity is both above 5 and below 2.
+[[rules]]
+id = "IMPOSSIBLE"
+when = "severity > 5 and severity < 2"
+outcome = "priority"
+reason = "Unreachable"
+
+[[rules]]
+id = "STALE"
+when = "hours_open > 48"
+outcome = "priority"
+reason = "Open for {hours_open:.0f} hours"
