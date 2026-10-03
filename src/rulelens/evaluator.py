@@ -37,6 +37,15 @@ Resolver = Callable[[tuple[str, ...]], Value]
 _ORDER_OPS: Final = {"<": operator.lt, "<=": operator.le, ">": operator.gt, ">=": operator.ge}
 _ARITH_OPS: Final = {"+": operator.add, "-": operator.sub, "*": operator.mul}
 _ORDERABLE: Final = frozenset({"number", "string", "date"})
+# Operators that need no kind checks when both operands are plain numbers (bool is excluded
+# because ``type(True) is bool``). Division and modulo stay on the slow path for the zero check.
+_NUMBER_TYPES: Final = frozenset({int, float})
+_NUMERIC_FAST: Final = {
+    **_ORDER_OPS,
+    **_ARITH_OPS,
+    "==": operator.eq,
+    "!=": operator.ne,
+}
 
 
 def kind_of(value: Value) -> str:
@@ -124,6 +133,12 @@ def _binary(node: Binary, resolve: Resolver, warn: list[str]) -> Value:
     if left is None or right is None:
         return None
 
+    if left.__class__ in _NUMBER_TYPES and right.__class__ in _NUMBER_TYPES:
+        fast = _NUMERIC_FAST.get(op)
+        if fast is not None:
+            result: Value = fast(left, right)
+            return result
+
     if op == "in":
         if not isinstance(right, tuple):
             return _mismatch(warn, "right-hand side of 'in' must be a list")
@@ -142,8 +157,8 @@ def _binary(node: Binary, resolve: Resolver, warn: list[str]) -> Value:
     if not (_is_number(left) and _is_number(right)):
         return _mismatch(warn, f"arithmetic '{op}' needs numbers, got {lk} and {rk}")
     if op in _ARITH_OPS:
-        result: Value = _ARITH_OPS[op](left, right)
-        return result
+        arithmetic: Value = _ARITH_OPS[op](left, right)
+        return arithmetic
     if right == 0:
         return _mismatch(warn, f"division by zero in '{op}'")
     return left / right if op == "/" else left % right

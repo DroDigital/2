@@ -15,15 +15,15 @@ from .simulate import GroupAudit, SimulationResult
 
 _CSS = """
 :root{--bg:#f7f8fa;--card:#fff;--ink:#16181d;--muted:#5d6472;--line:#dfe3ea;--accent:#2f5bd6;
---warn:#a35a00;--warn-bg:#fff4e0;--sev-l:40%;--track:#e8ebf1}
+--warn:#a35a00;--warn-bg:#fff4e0;--sev-l:32%;--chip-ink:#fff;--track:#e8ebf1}
 @media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a21;--ink:#e8eaee;--muted:#9aa2b1;
---line:#2a2f3a;--accent:#7b9bff;--warn:#ffb454;--warn-bg:#2b2112;--sev-l:58%;--track:#262b36}}
+--line:#2a2f3a;--accent:#7b9bff;--warn:#ffb454;--warn-bg:#2b2112;--sev-l:62%;--chip-ink:#0f1115;--track:#262b36}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 main{max-width:1040px;margin:0 auto;padding:28px 16px 64px}
 h1{font-size:1.5rem;margin:0 0 4px}h2{font-size:1.1rem;margin:0 0 12px}
-.sub{color:var(--muted);margin:0 0 24px;font-size:.9rem}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:0 0 18px}
+.sub{color:var(--muted);margin:0 0 24px;font-size:.9rem;overflow-wrap:anywhere}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:0 0 18px;overflow-x:auto}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:0 0 18px}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
 .tile b{display:block;font-size:1.6rem;line-height:1.2}.tile span{color:var(--muted);font-size:.82rem}
@@ -33,17 +33,17 @@ th{font-weight:600;color:var(--muted);font-size:.78rem;text-transform:uppercase;
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .bar{height:10px;background:var(--track);border-radius:5px;overflow:hidden;min-width:90px}
 .bar>i{display:block;height:100%;background:var(--accent)}
-.chip{display:inline-block;padding:1px 9px;border-radius:99px;font-size:.8rem;font-weight:600;color:#fff;
+.chip{display:inline-block;padding:1px 9px;border-radius:99px;font-size:.8rem;font-weight:600;color:var(--chip-ink);
 background:hsl(var(--h) 55% var(--sev-l))}
 .hm td{text-align:center;font-variant-numeric:tabular-nums;
 background:color-mix(in srgb,var(--accent) calc(var(--a,0)*70%),transparent)}
 .hm td.diag{color:var(--muted)}.hm th:first-child{text-align:left}
 .note{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 12px;margin:10px 0 0;font-size:.88rem}
 .flag{color:var(--warn);font-weight:600}.muted{color:var(--muted)}
-code{font:.88em ui-monospace,SFMono-Regular,Menlo,monospace}
+code{font:.88em ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
 details{border-top:1px solid var(--line);padding:8px 0}summary{cursor:pointer}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media (max-width:640px){.cols{grid-template-columns:1fr}.tile b{font-size:1.3rem}}
+@media (max-width:640px){.cols{grid-template-columns:1fr}.tile b{font-size:1.3rem}.card{padding:14px 12px}th,td{padding:6px 6px}}
 @media print{body{background:#fff}.card,.tile{break-inside:avoid}}
 """
 
